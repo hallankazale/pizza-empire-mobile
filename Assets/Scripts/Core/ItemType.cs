@@ -1,0 +1,1 @@
+namespace PizzaEmpire.Core { public enum ItemType { None, Wheat, Dough, RawPizza, BakedPizza } }
