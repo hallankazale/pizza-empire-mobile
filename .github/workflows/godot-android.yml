@@ -14,32 +14,30 @@ jobs:
       image: barichello/godot-ci:4.3
     steps:
       - uses: actions/checkout@v4
-
-      - name: Configure Android export environment
+      - name: Configure Android
         run: |
           set -eux
-          mkdir -p "$HOME/.local/share/godot/export_templates"
-          cp -r /root/.local/share/godot/export_templates/4.3.stable "$HOME/.local/share/godot/export_templates/" || true
-          mkdir -p build "$HOME/.android"
-          keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android -keystore "$HOME/.android/debug.keystore" -storepass android -dname "CN=Android Debug,O=Android,C=US" -validity 9999
-          JAVA_BIN="$(command -v java)"
-          JAVA_HOME_REAL="$(dirname "$(dirname "$(readlink -f "$JAVA_BIN")")")"
-          ANDROID_SDK_REAL="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/opt/android-sdk}}"
-          echo "Java: $JAVA_HOME_REAL"
-          echo "Android SDK: $ANDROID_SDK_REAL"
-          godot --headless --editor --path godot --quit             --editor-settings android/java_sdk_path="$JAVA_HOME_REAL"             --editor-settings android/sdk_path="$ANDROID_SDK_REAL" || true
+          mkdir -p /root/.android build
+          rm -f /root/.android/debug.keystore
+          keytool -genkeypair -v -keystore /root/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          mkdir -p /root/.config/godot
+          cat > /root/.config/godot/editor_settings-4.tres <<EOF
+          [gd_resource format=3]
 
-      - name: Export Android APK
+          [resource]
+          export/android/android_sdk_path = "/usr/lib/android-sdk"
+          export/android/java_sdk_path = "/usr/lib/jvm/java-17-openjdk-amd64"
+          export/android/debug_keystore = "/root/.android/debug.keystore"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          EOF
+          mkdir -p /root/.local/share/godot/export_templates
+          cp -r /root/.local/share/godot/export_templates/4.3.stable /root/.local/share/godot/export_templates/ || true
+      - name: Export APK
         working-directory: godot
-        env:
-          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
         run: |
-          set -eux
-          JAVA_BIN="$(command -v java)"
-          JAVA_HOME_REAL="$(dirname "$(dirname "$(readlink -f "$JAVA_BIN")")")"
-          ANDROID_SDK_REAL="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/opt/android-sdk}}"
-          godot --headless --path .             --editor-settings android/java_sdk_path="$JAVA_HOME_REAL"             --editor-settings android/sdk_path="$ANDROID_SDK_REAL"             --export-debug "Android" ../build/PizzaEmpire.apk
-
+          godot --headless --verbose --export-debug "Android" ../build/PizzaEmpire.apk
+          test -f ../build/PizzaEmpire.apk
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
