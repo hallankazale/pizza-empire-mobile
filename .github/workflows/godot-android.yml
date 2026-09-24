@@ -14,14 +14,32 @@ jobs:
       image: barichello/godot-ci:4.3
     steps:
       - uses: actions/checkout@v4
-      - name: Prepare export templates
+
+      - name: Configure Android export environment
         run: |
-          mkdir -p ~/.local/share/godot/export_templates
-          cp -r /root/.local/share/godot/export_templates/4.3.stable ~/.local/share/godot/export_templates/ || true
-          mkdir -p build
+          set -eux
+          mkdir -p "$HOME/.local/share/godot/export_templates"
+          cp -r /root/.local/share/godot/export_templates/4.3.stable "$HOME/.local/share/godot/export_templates/" || true
+          mkdir -p build "$HOME/.android"
+          keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android -keystore "$HOME/.android/debug.keystore" -storepass android -dname "CN=Android Debug,O=Android,C=US" -validity 9999
+          JAVA_BIN="$(command -v java)"
+          JAVA_HOME_REAL="$(dirname "$(dirname "$(readlink -f "$JAVA_BIN")")")"
+          ANDROID_SDK_REAL="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/opt/android-sdk}}"
+          echo "Java: $JAVA_HOME_REAL"
+          echo "Android SDK: $ANDROID_SDK_REAL"
+          godot --headless --editor --path godot --quit             --editor-settings android/java_sdk_path="$JAVA_HOME_REAL"             --editor-settings android/sdk_path="$ANDROID_SDK_REAL" || true
+
       - name: Export Android APK
         working-directory: godot
-        run: godot --headless --export-debug "Android" ../build/PizzaEmpire.apk
+        env:
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+        run: |
+          set -eux
+          JAVA_BIN="$(command -v java)"
+          JAVA_HOME_REAL="$(dirname "$(dirname "$(readlink -f "$JAVA_BIN")")")"
+          ANDROID_SDK_REAL="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/opt/android-sdk}}"
+          godot --headless --path .             --editor-settings android/java_sdk_path="$JAVA_HOME_REAL"             --editor-settings android/sdk_path="$ANDROID_SDK_REAL"             --export-debug "Android" ../build/PizzaEmpire.apk
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
